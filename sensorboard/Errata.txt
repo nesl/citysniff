@@ -30,6 +30,7 @@ R20 = (Vout_1Max/Vin_1+ - 1) * Rs
 
 Note that Rs is on pin 4 on JP9, R_H on pin 3 of JP9.
 
+
 MSP430 patch wires
 ==================
 

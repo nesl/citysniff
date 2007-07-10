@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+svn export svn+ssh://thomass@lcav.epfl.ch/home/anoncvs/svnroot/citysniff/ipkg/bsl tmp
+rm tmp/build_ipkg
+ipkg-build tmp
+rm -rf tmp

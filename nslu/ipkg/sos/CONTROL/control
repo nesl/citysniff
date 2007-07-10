@@ -1,0 +1,9 @@
+Package: citysniff-sos
+Section: Comm
+Priority: optional
+Version: 0.1
+Architecture: armeb
+Source: http://citysniff.org
+Maintainer: Thomas Schmid <thomas.schmid@ucla.edu>
+Depends: 
+Description: This is the sossrv.exe and sos_tool.exe which are needed to interact with nodes running SOS code.

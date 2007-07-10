@@ -1,0 +1,9 @@
+Package: bsl
+Section: Comm
+Priority: optional
+Version: 1.39-telos-8
+Architecture: armeb
+Source: http://sensorscope.epfl.ch/wiki/index.php?title=CitySniff
+Maintainer: Thomas Schmid <thomas.schmid@ucla.edu>
+Depends: python-core, python-stringold, python-fcntl, python-terminal
+Description: This is the TinyOS BSL which is used to upload images to a MSP430 micro controller.
