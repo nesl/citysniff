@@ -10,7 +10,7 @@
 //#define LED_DEBUG
 #include <led_dbg.h>
 
-#define SAMPLES 1020
+#define SAMPLES 512
 
 enum {
     MIC_IDLE,
@@ -19,7 +19,7 @@ enum {
 
 typedef struct mic_state {
     sos_pid_t spid;
-    uint16_t data[SAMPLES];
+    uint16_t *data;
     uint8_t state;
 } mic_state_t;
 
@@ -46,6 +46,8 @@ static int8_t mic_msg_handler(void *state, Message *msg){
 
     switch(msg->type) {
         case MSG_INIT:
+            s->data = sys_malloc(SAMPLES*sizeof(uint16_t));
+
             P6DIR &=~(0x01); //input
             P6SEL |= 0x01; //ADC12 function
             SETBITHIGH(P5OUT, 0); // enable microphone

@@ -12,10 +12,14 @@
 #include <citysniff.h>
 
 #define OZONE_TID 0
+#define AVERAGE_NUM 10
 
 typedef struct ozone_state {
 	uint8_t state;
   uint8_t ozone_state;
+  uint8_t ozone_flag;
+  uint8_t ozone_reading;
+  uint16_t ozone_value;
 } ozone_state_t;
 
 enum {
@@ -34,15 +38,15 @@ int8_t ozone_data_ready_cb(func_cb_ptr cb, uint8_t port, uint16_t value, uint8_t
 static int8_t ozone_msg_handler(void *state, Message *msg);
 
 static const mod_header_t mod_header SOS_MODULE_HEADER = {
-  mod_id : OZONE_PID,
-  state_size : sizeof(ozone_state_t),
-  num_sub_func : 0,
-  num_prov_func : 2,
-	platform_type : HW_TYPE,
-	processor_type : MCU_TYPE,
-	code_id : ehtons(OZONE_PID),
-  module_handler : ozone_msg_handler,
-	funct : {
+  .mod_id         = OZONE_PID,
+  .state_size     = sizeof(ozone_state_t),
+  .num_sub_func   = 0,
+  .num_prov_func  = 2,
+	.platform_type  = HW_TYPE,
+	.processor_type = MCU_TYPE,
+	.code_id        = ehtons(OZONE_PID),
+  .module_handler = ozone_msg_handler,
+	.funct = {
 		{ozone_control, "cCw2", OZONE_PID, SENSOR_CONTROL_FID},
 		{ozone_data_ready_cb, "cCS3", OZONE_PID, SENSOR_DATA_READY_FID},
 	},
@@ -61,11 +65,24 @@ int8_t ozone_data_ready_cb(func_cb_ptr cb, uint8_t port, uint16_t value, uint8_t
 	switch(port) {
 		case OZONE_SID:
       if(s->ozone_state == OZONE_BUSY){
+        if(s->ozone_flag&SENSOR_AVERAGE){
+          // we want to get an averaged reading
+          if(s->ozone_reading > 0){
+            s->ozone_value += value;
+            s->ozone_reading -= 1;
+            LED_DBG(LED_GREEN_TOGGLE);
+            return sys_adc_get_data(OZONE_SID, 0);
+          } else {
+            s->ozone_value = s->ozone_value / AVERAGE_NUM;
+          }
+        } else {
+          s->ozone_value = value;
+        }
         // disable heating
         ADC12CTL0 = REF2_5V + REFON; // Internal 2.5V ref on
         DAC12_0CTL = DAC12IR + DAC12AMP_5 + DAC12ENC; // Internal ref gain 1
         DAC12_0DAT = 0x0;  // 0V
-        if(sys_sensor_data_ready(OZONE_SID, value, flags) == SOS_OK){
+        if(sys_sensor_data_ready(OZONE_SID, s->ozone_value, flags) == SOS_OK){
           LED_DBG(LED_RED_OFF);
         }
         // report data
@@ -86,15 +103,15 @@ static int8_t ozone_control(func_cb_ptr cb, uint8_t cmd, void* data) {\
 
 	ozone_state_t *s = (ozone_state_t*)sys_get_state();
   
-	//uint8_t ctx = *(uint8_t*)data;
+	//uint8_t flag = *(uint8_t*)data;
 	
 	switch (cmd) {
 		case SENSOR_GET_DATA_CMD:
       if(s->ozone_state == OZONE_READY){
         // start heating for 4 minutes
         s->ozone_state = OZONE_HEATING;
-        sys_timer_start(OZONE_TID, 245760, TIMER_ONE_SHOT);
-        //sys_timer_start(OZONE_TID, 2457, TIMER_ONE_SHOT);
+        //sys_timer_start(OZONE_TID, 245760, TIMER_ONE_SHOT);
+        sys_timer_start(OZONE_TID, 2457, TIMER_ONE_SHOT);
         ADC12CTL0 = REF2_5V + REFON; // Internal 2.5V ref on
         DAC12_0CTL = DAC12IR + DAC12AMP_5 + DAC12ENC; // Internal ref gain 1
         DAC12_0DAT = 0x0A3D;  // 1.6V
@@ -149,6 +166,8 @@ int8_t ozone_msg_handler(void *state, Message *msg)
 			sys_sensor_register(OZONE_PID, OZONE_SID, SENSOR_CONTROL_FID, (void*)(&s->state));
 
       s->ozone_state = OZONE_IDLE;
+      s->ozone_flag = 0;
+      //s->ozone_flag = SENSOR_AVERAGE;
       // make sure the sensor is off
       SETBITLOW(P5OUT, 3);
 
@@ -158,6 +177,8 @@ int8_t ozone_msg_handler(void *state, Message *msg)
       if(s->ozone_state == OZONE_HEATING){
         s->ozone_state = OZONE_BUSY;
         // get ready to read ozone sensor
+        s->ozone_reading = AVERAGE_NUM;
+        s->ozone_value = 0;
         return sys_adc_get_data(OZONE_SID, 0);
       } else {
         return -EINVAL;

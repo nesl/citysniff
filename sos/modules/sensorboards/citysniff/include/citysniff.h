@@ -9,9 +9,24 @@
 #define MSG_MIC_BUSY (MOD_MSG_START + 80)
 #define MSG_MIC_DATA_READY (MOD_MSG_START + 81)
 #define MSG_MIC_GET_MEASUREMENT (MOD_MSG_START + 82)
+#define MSG_OZONE_DATA (MOD_MSG_START + 83)
+#define MSG_SOUND_DATA (MOD_MSG_START + 84)
+
+typedef struct {
+    uint32_t measurement;
+} msg_sound_t;
+
+typedef struct {
+    uint16_t measurement;
+} msg_ozone_t;
+
 
 enum {
     OZONE_SID = 1,
+};
+
+enum {
+    SENSOR_AVERAGE = 1,
 };
 
 #define OZONE_HW_CH INCH_1

@@ -5,9 +5,12 @@
 #define LED_DEBUG
 #include <led_dbg.h>
 
-#define SAMPLER_TID 0
+#define SOUND_TID 0
+#define OZONE_TID 1
 
-typedef struct adc_sampler_state {
+#define ROOTNODE 4000
+
+typedef struct sampler_state {
     uint8_t spid;
 } sampler_state_t;
 
@@ -30,24 +33,45 @@ static int8_t sampler_msg_handler(void *state, Message *msg){
     switch(msg->type) {
         case MSG_INIT:
             s->spid = msg->did;
-            sys_timer_start(SAMPLER_TID, 3048, TIMER_REPEAT);
+            if(sys_id() != ROOTNODE){
+                if(sys_id()%2) {
+                    sys_timer_start(SOUND_TID, 3048, TIMER_REPEAT);
+                } else {
+                    // every 30 minutes
+                    //sys_timer_start(OZONE_TID, 1843200, TIMER_REPEAT);
+                    sys_timer_start(OZONE_TID, 5000, TIMER_REPEAT);
+                }
+            }
             break;
 
-        case MSG_TIMER_TIMEOUT:
-            LED_DBG(LED_GREEN_ON);
-            // microphone
-            //sys_post_value(MIC_PID, MSG_MIC_GET_MEASUREMENT, 0, SOS_MSG_RELEASE);
-            // ozone
-            sys_sensor_enable(OZONE_SID);
-            sys_sensor_get_data(OZONE_SID);
+        case MSG_TIMER_TIMEOUT: 
+            {
+                MsgParam *p = (MsgParam*)(msg->data);
+                LED_DBG(LED_GREEN_ON);
+                switch(p->byte) {
+                    case SOUND_TID:
+                        {
+                            // microphone
+                            sys_post_value(MIC_PID, MSG_MIC_GET_MEASUREMENT, 0, SOS_MSG_RELEASE);
+                        }
+                        break;
+
+                    case OZONE_TID:
+                        // ozone
+                        sys_sensor_enable(OZONE_SID);
+                        sys_sensor_get_data(OZONE_SID);
+
+                        break;
+                }
+            }
             break;
 
         case MSG_MIC_DATA_READY:
             {
-                uint32_t* data = sys_malloc(sizeof(uint32_t));
-                memcpy((void*)data, (void*)msg->data, sizeof(uint32_t));
+                msg_sound_t* m = (msg_sound_t*)sys_malloc(sizeof(msg_sound_t));
+                memcpy((void*)&(m->measurement), (void*)msg->data, sizeof(uint32_t));
                 LED_DBG(LED_GREEN_OFF);
-                sys_post_uart(s->spid, MSG_MIC_DATA_READY, sizeof(uint32_t), data, SOS_MSG_RELEASE, BCAST_ADDRESS);
+                sys_post_net(s->spid, MSG_SOUND_DATA, sizeof(msg_sound_t), m, SOS_MSG_RELEASE, ROOTNODE);
                 break;
             }   
 
@@ -61,23 +85,44 @@ static int8_t sampler_msg_handler(void *state, Message *msg){
 
                     case OZONE_SID:
                         {
-                            MsgParam* data_msg;
+                            msg_ozone_t* data_msg;
 
                             LED_DBG(LED_GREEN_OFF);
                             sys_sensor_disable(OZONE_SID);
-                            data_msg = (MsgParam*)sys_malloc(sizeof(MsgParam));
-                            memcpy((void*)data_msg, (void*)msg->data, sizeof(MsgParam));
+                            data_msg = (msg_ozone_t*)sys_malloc(sizeof(msg_ozone_t));
+                            data_msg->measurement = ((MsgParam*)msg->data)->word;
 
-                            sys_post_uart(s->spid,
-                                    MSG_DATA_READY,
-                                    sizeof(MsgParam),
+                            sys_post_net(s->spid,
+                                    MSG_OZONE_DATA,
+                                    sizeof(msg_ozone_t),
                                     data_msg,
                                     SOS_MSG_RELEASE,
-                                    BCAST_ADDRESS);
+                                    ROOTNODE);
                             break;
                         }
                     }
             }
+
+        case MSG_SOUND_DATA:
+            LED_DBG(LED_RED_TOGGLE);
+            if(sys_id() == ROOTNODE){
+                msg_sound_t* m = (msg_sound_t*)sys_malloc(sizeof(msg_sound_t));
+                memcpy((void*)m, (void*)msg->data, sizeof(msg_sound_t));
+                sys_post_uart(s->spid, MSG_SOUND_DATA, sizeof(msg_sound_t), m, SOS_MSG_RELEASE, BCAST_ADDRESS);
+            }                        
+
+           break;
+
+        case MSG_OZONE_DATA:
+           LED_DBG(LED_RED_TOGGLE);
+           if(sys_id() == ROOTNODE){
+                msg_ozone_t* m = (msg_ozone_t*)sys_malloc(sizeof(msg_ozone_t));
+                memcpy((void*)m, (void*)msg->data, sizeof(msg_ozone_t));
+                sys_post_uart(s->spid, MSG_OZONE_DATA, sizeof(msg_ozone_t), m, SOS_MSG_RELEASE, BCAST_ADDRESS);
+            }                        
+
+
+            break;
 
         case MSG_FINAL:
             break;
