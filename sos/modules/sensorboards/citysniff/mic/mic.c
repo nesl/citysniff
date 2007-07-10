@@ -3,10 +3,14 @@
 #include <msp430/adc12.h>
 #include <msp430/dma.h>
 #include <bitsop.h>
+#include <math.h>
+
 #include "citysniff.h"
 
 #define LED_DEBUG
 #include <led_dbg.h>
+
+#define SAMPLES 1020
 
 enum {
     MIC_IDLE,
@@ -15,7 +19,7 @@ enum {
 
 typedef struct mic_state {
     sos_pid_t spid;
-    uint16_t data[1020];
+    uint16_t data[SAMPLES];
     uint8_t state;
 } mic_state_t;
 
@@ -62,16 +66,32 @@ static int8_t mic_msg_handler(void *state, Message *msg){
             } else {
                 s->spid = msg->sid;
                 s->state = MIC_BUSY;
-                if(mic_start(s->data, 1020, EIGHT_KHZ) != SOS_OK){
-                    sys_post_value(msg->, MSG_MIC_BUSY, 0, SOS_MSG_RELEASE);
+                if(mic_start(s->data, SAMPLES, EIGHT_KHZ) != SOS_OK){
+                    sys_post_value(msg->sid, MSG_MIC_BUSY, 0, SOS_MSG_RELEASE);
                 }
             }
             break;
 
         case MSG_MIC_DATA_READY:
-            s->state = MIC_IDLE;
-            sys_post_value(s->spid, MSG_MIC_DATA_READY, 0, SOS_MSG_RELEASE);
-            break;
+            {
+                uint32_t sum = 0;
+                uint16_t avg;
+                uint16_t i = 0;
+
+                for(i=0; i<SAMPLES; i++){
+                    sum += s->data[i];
+                }
+
+                avg = sum / SAMPLES;
+
+                for(i=0; i<SAMPLES; i++){
+                    sum += ((s->data[i]-avg)*(s->data[i]-avg));
+                }
+
+                s->state = MIC_IDLE;
+                sys_post_value(s->spid, MSG_MIC_DATA_READY, sum, SOS_MSG_RELEASE);
+                break;
+            }
         default:
             return -EINVAL;
     }

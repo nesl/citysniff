@@ -1,4 +1,5 @@
 #include <sys_module.h>
+#include <string.h>
 #include <citysniff.h>
 
 #define LED_DEBUG
@@ -33,14 +34,20 @@ static int8_t sampler_msg_handler(void *state, Message *msg){
             break;
 
         case MSG_TIMER_TIMEOUT:
+            SYS_LED_DBG(LED_GREEN_ON);
             sys_post_value(MIC_PID, MSG_MIC_GET_MEASUREMENT, 0, SOS_MSG_RELEASE);
             break;
 
         case MSG_MIC_DATA_READY:
-            SYS_LED_DBG(LED_GREEN_ON);
-            break;
-                
+            {
+                uint32_t* data = sys_malloc(sizeof(uint32_t));
+                memcpy((void*)data, (void*)msg->data, sizeof(uint32_t));
+                SYS_LED_DBG(LED_GREEN_OFF);
+                sys_post_uart(s->spid, MSG_MIC_DATA_READY, sizeof(uint32_t), data, SOS_MSG_RELEASE, BCAST_ADDRESS);
+                break;
+            }   
         case MSG_MIC_BUSY:
+            SYS_LED_DBG(LED_GREEN_OFF);
             break;
 
         case MSG_FINAL:
@@ -53,7 +60,7 @@ static int8_t sampler_msg_handler(void *state, Message *msg){
 }
 
 #ifndef _MODULE_
-mod_header_ptr adc_sampler_get_header()
+mod_header_ptr sampler_get_header()
 {
     return sos_get_header_address(mod_header);
 }
