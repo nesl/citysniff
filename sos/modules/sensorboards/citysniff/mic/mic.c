@@ -7,7 +7,7 @@
 
 #include "citysniff.h"
 
-#define LED_DEBUG
+//#define LED_DEBUG
 #include <led_dbg.h>
 
 #define SAMPLES 1020
@@ -75,6 +75,7 @@ static int8_t mic_msg_handler(void *state, Message *msg){
         case MSG_MIC_DATA_READY:
             {
                 uint32_t sum = 0;
+                uint16_t* data;
                 uint16_t avg;
                 uint16_t i = 0;
 
@@ -83,6 +84,11 @@ static int8_t mic_msg_handler(void *state, Message *msg){
                 }
 
                 avg = sum / SAMPLES;
+
+                data = (uint16_t*)sys_malloc(sizeof(uint16_t));
+                *data = avg;
+
+                sys_post_uart(MIC_PID, MSG_MIC_DATA_READY, sizeof(uint16_t), data, SOS_MSG_RELEASE, BCAST_ADDRESS);
 
                 for(i=0; i<SAMPLES; i++){
                     sum += ((s->data[i]-avg)*(s->data[i]-avg));
@@ -99,7 +105,7 @@ static int8_t mic_msg_handler(void *state, Message *msg){
 }
 
 interrupt (DACDMA_VECTOR) dac_dma_interrupt (){
-    SYS_LED_DBG(LED_YELLOW_OFF);
+    LED_DBG(LED_YELLOW_OFF);
     if((DMA0CTL & DMAIFG) == DMAIFG){
         mic_stop( );
         DMA0CTL &= ~DMAIFG;
@@ -110,7 +116,7 @@ interrupt (DACDMA_VECTOR) dac_dma_interrupt (){
         // DMA got aboarted.. try again next time
         DMA0CTL = 0;
         mic_stop();
-        SYS_LED_DBG(LED_RED_TOGGLE);
+        LED_DBG(LED_RED_TOGGLE);
     } else {
         // something went wrong. Stop the dma and adc and try again next time
         DMA0CTL = 0;
@@ -119,10 +125,10 @@ interrupt (DACDMA_VECTOR) dac_dma_interrupt (){
 }
 
 int8_t mic_start(uint16_t* start, uint16_t length, enum adcRate rate){
-  SYS_LED_DBG(LED_YELLOW_ON);
+  LED_DBG(LED_YELLOW_ON);
   
   if((DMA0CTL & DMAEN) == DMAEN){ //a DMA trasnfer is active
-    SYS_LED_DBG(LED_RED_TOGGLE);
+    LED_DBG(LED_RED_TOGGLE);
 	// this shouldn't happen. Stop it and try again next time.
 	mic_stop();
 	DMA0CTL = 0;

@@ -30,25 +30,54 @@ static int8_t sampler_msg_handler(void *state, Message *msg){
     switch(msg->type) {
         case MSG_INIT:
             s->spid = msg->did;
-            sys_timer_start(SAMPLER_TID, 2048, TIMER_REPEAT);
+            sys_timer_start(SAMPLER_TID, 3048, TIMER_REPEAT);
             break;
 
         case MSG_TIMER_TIMEOUT:
-            SYS_LED_DBG(LED_GREEN_ON);
-            sys_post_value(MIC_PID, MSG_MIC_GET_MEASUREMENT, 0, SOS_MSG_RELEASE);
+            LED_DBG(LED_GREEN_ON);
+            // microphone
+            //sys_post_value(MIC_PID, MSG_MIC_GET_MEASUREMENT, 0, SOS_MSG_RELEASE);
+            // ozone
+            sys_sensor_enable(OZONE_SID);
+            sys_sensor_get_data(OZONE_SID);
             break;
 
         case MSG_MIC_DATA_READY:
             {
                 uint32_t* data = sys_malloc(sizeof(uint32_t));
                 memcpy((void*)data, (void*)msg->data, sizeof(uint32_t));
-                SYS_LED_DBG(LED_GREEN_OFF);
+                LED_DBG(LED_GREEN_OFF);
                 sys_post_uart(s->spid, MSG_MIC_DATA_READY, sizeof(uint32_t), data, SOS_MSG_RELEASE, BCAST_ADDRESS);
                 break;
             }   
+
         case MSG_MIC_BUSY:
-            SYS_LED_DBG(LED_GREEN_OFF);
+            LED_DBG(LED_GREEN_OFF);
             break;
+
+        case MSG_DATA_READY:
+            {
+                switch (((MsgParam*)msg->data)->byte ){
+
+                    case OZONE_SID:
+                        {
+                            MsgParam* data_msg;
+
+                            LED_DBG(LED_GREEN_OFF);
+                            sys_sensor_disable(OZONE_SID);
+                            data_msg = (MsgParam*)sys_malloc(sizeof(MsgParam));
+                            memcpy((void*)data_msg, (void*)msg->data, sizeof(MsgParam));
+
+                            sys_post_uart(s->spid,
+                                    MSG_DATA_READY,
+                                    sizeof(MsgParam),
+                                    data_msg,
+                                    SOS_MSG_RELEASE,
+                                    BCAST_ADDRESS);
+                            break;
+                        }
+                    }
+            }
 
         case MSG_FINAL:
             break;

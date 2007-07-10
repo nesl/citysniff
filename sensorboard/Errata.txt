@@ -1,0 +1,42 @@
+This file is an errata for the CitySniff sensorboard. It will describe
+necessary hardware changes, as well as explain some of the calibration
+resistors that need to be changed in case of differences in the O3
+sensor or microphone sensitivity.
+
+Microphone
+==========
+R33 and R32 are two resistors to set the gain on the audio amplifier.
+For the current version, we needed to put them to the highest values,
+i.e., R33=175kOhm, R32=5kOhm.
+
+Additionally we removed C34, shorted R32, and replaced R30=10kOhm (not
+    sure?)
+
+
+O3 Sensor
+=========
+To get the O3 sensor to work better, I needed to recalculate the value
+for R20, since the minimum resistance of the sensor is <50kOhm. After
+some tests, I found that Rs=17.14kOhm. Thus, I choosing R20=21.1kOhm
+should scale the maximum voltage to 2.5 Volt.
+
+To calculate, measure Vout_1 (on pin 6 of U6) and Vin_1+ (on pin 3 of
+    U6):
+Rs = R20/(Vout_1-Vin_1+)
+
+Then, use
+
+R20 = (Vout_1Max/Vin_1+ - 1) * Rs
+
+Note that Rs is on pin 4 on JP9, R_H on pin 3 of JP9.
+
+MSP430 patch wires
+==================
+
+Some of the pins were shared and thus needed to be replaced. The signals
+are now as follows:
+
+ENABLE_MIC moved to P5.0 (pin 44)
+ENABLE_MSG moved to P5.3 (pin 47)
+
+
